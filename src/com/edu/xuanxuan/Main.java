@@ -21,11 +21,11 @@ public class Main {
             //开始营业
             coffeeHourse.start();
             try {
-                TimeUnit.SECONDS.sleep(30);
+                TimeUnit.SECONDS.sleep(100);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            //关闭
+            //关闭营业
             coffeeHourse.shutDown();
         });
         TimeUnit.SECONDS.sleep(2);

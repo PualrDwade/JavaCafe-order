@@ -14,14 +14,14 @@ import java.util.concurrent.TimeUnit;
  */
 public class Main {
     public static void main(String[] args) throws InterruptedException {
-        //设置营业时间
         ExecutorService executorService = Executors.newCachedThreadPool();
+        //自定义咖啡厅参数
         CoffeeHourse coffeeHourse = new CoffeeHourse()
                 .setMaxSeatNumber(50)
                 .setMaxOrderNumber(20)
                 .setMaxChefNumber(10)
                 .setMaxTime(1000);//单位为SECOND
-        //也可以直接使用默认的
+        //也可以直接使用默认参数(无参构造函数)
 //        CoffeeHourse coffeeHourse = new CoffeeHourse();
 
         //咖啡厅开门营业
@@ -29,8 +29,10 @@ public class Main {
             //开始营业
             coffeeHourse.start();
         });
+
         //这是是确保先开门营业
         TimeUnit.SECONDS.sleep(2);
+
         //模拟顾客进入咖啡厅
         for (int i = 0; i < 1000; ++i) {
             executorService.execute(new CustomerOrderTask(coffeeHourse, "顾客:" + i));

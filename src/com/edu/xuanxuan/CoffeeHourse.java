@@ -126,6 +126,7 @@ public final class CoffeeHourse {
         } finally {
             lock.unlock();
         }
+
         //同时为此用户开一个单独的线程,根据此用户的订单来获取咖啡
         Future<Coffee> coffeeFuture = executorService.submit(new Callable<Coffee>() {
             @Override
@@ -210,6 +211,7 @@ public final class CoffeeHourse {
             executorService.execute(task);
             chefWorkerTasks.add(task);
         }
+
         //开始营业
         try {
             TimeUnit.SECONDS.sleep(time);

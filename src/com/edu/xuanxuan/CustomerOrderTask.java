@@ -23,6 +23,7 @@ public class CustomerOrderTask implements Runnable {
     public void run() {
         //首先排队,找到位置之后坐下(阻塞)
         coffeeHourse.addCustomer();
+
         //坐下之后发起咖啡订单并排队等候咖啡
         Future<Coffee> coffeeFuture = coffeeHourse.addOrder(new Order(Coffee.random(Coffee.class), this));
         try {
@@ -33,6 +34,7 @@ public class CustomerOrderTask implements Runnable {
         } catch (ExecutionException e) {
             e.printStackTrace();
         }
+
         //拿到咖啡离开
         System.out.println(name + "离开");
         coffeeHourse.removeCustomer();

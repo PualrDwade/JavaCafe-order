@@ -39,8 +39,7 @@ public final class CoffeeHourse {
     private Condition seatCondition = lock.newCondition();
     //咖啡condition
     private Condition coffeeCondition = lock.newCondition();
-
-
+    
     public CoffeeHourse setMaxTime(int maxTime) {
         this.time = maxTime;
         return this;
@@ -143,7 +142,6 @@ public final class CoffeeHourse {
         return coffeeFuture;
     }
 
-
     /**
      * 完成咖啡制作,添加咖啡进入待取状态
      *
@@ -160,7 +158,6 @@ public final class CoffeeHourse {
             orderCoffeeMap.notifyAll();
         }
     }
-
 
     /**
      * 提供一个订单(阻塞)
@@ -185,7 +182,6 @@ public final class CoffeeHourse {
             lock.unlock();
         }
     }
-
 
     /**
      * 咖啡厅关门->不再接纳新顾客(提供外部显示关闭)

@@ -27,19 +27,19 @@ public class CustomerOrderTask implements Runnable {
         Future<Coffee> coffeeFuture = coffeeHourse.addOrder(new Order(Coffee.random(Coffee.class), this));
         try {
             Coffee coffee = coffeeFuture.get();
-            System.out.println("顾客:" + this.name + "拿到咖啡:" + coffee);
+            System.out.println(name + "拿到咖啡:" + coffee);
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (ExecutionException e) {
             e.printStackTrace();
         }
         //拿到咖啡离开
-        System.out.println("顾客离开");
+        System.out.println(name + "离开");
         coffeeHourse.removeCustomer();
     }
 
     @Override
     public String toString() {
-        return "顾客名:" + this.name;
+        return name;
     }
 }

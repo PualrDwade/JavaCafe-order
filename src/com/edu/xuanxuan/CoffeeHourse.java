@@ -7,10 +7,13 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * 咖啡厅类
+ * 咖啡厅类,作为消息中间件,内部加锁(reentrant锁)
+ * 作为整体的生产-消费模型的核心
  */
 public final class CoffeeHourse {
+    //记录工作状态
     private volatile boolean work;
+    //线程service池
     private ExecutorService executorService = Executors.newCachedThreadPool();
     //最大厨师数
     private int maxChefNumber = 3;//默认3个厨师
@@ -20,32 +23,28 @@ public final class CoffeeHourse {
     private volatile int seatNumber = maxSeatNumber;
     //最大订单数
     private int maxOrderNumber = 10;//默认最多10个订单
+    //营业时间
+    private int time = 60;//默认营业1分钟
     //订单排队(重点,客户生产订单,餐厅消费订单,建立生产消费者模型)
     private Queue<Order> orders = new LinkedList<>();
     //订单->咖啡
     private Map<Order, Coffee> orderCoffeeMap = new HashMap<>();
     //持有厨师
     private List<ChefWorkerTask> chefWorkerTasks = new ArrayList<>(maxChefNumber);
-    //订单锁
-    private Lock ordersLock = new ReentrantLock();
-
+    //可重入锁
+    private Lock lock = new ReentrantLock();
     //订单condition
-    private Condition orderCondition = ordersLock.newCondition();
-
-    //座位锁
-    private Lock seatLock = new ReentrantLock();
-
-    //座位condition1
-    private Condition seatFull = seatLock.newCondition();
-
-    //工作lock
-    private Condition workCondition = seatLock.newCondition();
-
-    //咖啡锁
-    private Lock coffeeLock = new ReentrantLock();
-
+    private Condition orderCondition = lock.newCondition();
+    //座位condition
+    private Condition seatCondition = lock.newCondition();
     //咖啡condition
-    private Condition coffeeCondition = coffeeLock.newCondition();
+    private Condition coffeeCondition = lock.newCondition();
+
+
+    public CoffeeHourse setMaxTime(int maxTime) {
+        this.time = maxTime;
+        return this;
+    }
 
     public CoffeeHourse setMaxChefNumber(int maxChefNumber) {
         this.maxChefNumber = maxChefNumber;
@@ -71,12 +70,12 @@ public final class CoffeeHourse {
         if (!work) {
             return;
         }
-        seatLock.lock();
+        lock.lock();
         try {
             //循环等待一个conditon
             while (seatNumber <= 0) {
                 try {
-                    seatFull.await();
+                    seatCondition.await();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -85,7 +84,7 @@ public final class CoffeeHourse {
             --seatNumber;
             System.out.println("坐下一个顾客");
         } finally {
-            seatLock.unlock();
+            lock.unlock();
         }
     }
 
@@ -93,14 +92,14 @@ public final class CoffeeHourse {
      * 移除一个顾客
      */
     public void removeCustomer() {
-        seatLock.lock();
+        lock.lock();
         try {
             if (seatNumber < maxSeatNumber)
                 ++seatNumber;
             System.out.println("离开一位顾客,当前座位数:" + seatNumber);
-            seatFull.signalAll();//同时所有等待作为的顾客们
+            seatCondition.signalAll();//同时所有等待作为的顾客们
         } finally {
-            seatLock.unlock();
+            lock.unlock();
         }
     }
 
@@ -111,23 +110,24 @@ public final class CoffeeHourse {
      * @param order
      */
     public Future<Coffee> addOrder(Order order) {
-        synchronized (orders) {
-            System.out.println("addOrder记录:" + order + "当前积累订单数:" + orders.size());
+        lock.lock();
+        try {
             while (this.orders.size() == maxOrderNumber) {
                 try {
-                    orders.wait();
+                    orderCondition.await();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
             //添加一个订单
             orders.add(order);
-            orders.notifyAll();//通知其他线程,是其他线程获得订单列表的锁
+            System.out.println("addOrder记录:" + order + "当前积累订单数:" + orders.size());
+            orderCondition.signalAll();//通知其他线程,是其他线程获得订单列表的锁
+        } finally {
+            lock.unlock();
         }
-
         //同时为此用户开一个单独的线程,根据此用户的订单来获取咖啡
         Future<Coffee> coffeeFuture = executorService.submit(new Callable<Coffee>() {
-
             @Override
             public Coffee call() throws Exception {
                 synchronized (orderCoffeeMap) {
@@ -144,28 +144,6 @@ public final class CoffeeHourse {
 
 
     /**
-     * 提供一个订单(阻塞)
-     */
-    public Order takeOrder() {
-        synchronized (orders) {
-            System.out.println("厨师申请得到订单...");
-            while (this.orders.size() <= 0) {
-                try {
-                    orders.wait();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-            //唤醒之后,提供一个订单,并通知其他线程当前订单发生变化
-            Order order = orders.poll();
-            orders.notifyAll();
-            System.out.println("takeOrder记录:" + order + "还剩" + orders.size() + "个订单");
-            return order;
-        }
-    }
-
-
-    /**
      * 完成咖啡制作,添加咖啡进入待取状态
      *
      * @param order
@@ -174,7 +152,7 @@ public final class CoffeeHourse {
         //使用了悲观锁的策略,目前只是简单实现,后续考虑加入读写锁(乐观)
         synchronized (orderCoffeeMap) {
             if (orderCoffeeMap.containsKey(order)) {
-                throw new Exception("订单重复");
+                throw new Exception("订单重复异常");
             }
             orderCoffeeMap.put(order, order.getCoffee());
             //通知其他正在阻塞的线程,让其他线程有机会获得orderCoffeeMap的锁
@@ -184,7 +162,32 @@ public final class CoffeeHourse {
 
 
     /**
-     * 咖啡厅关门->不再接纳新顾客
+     * 提供一个订单(阻塞)
+     */
+    public Order takeOrder() {
+        lock.lock();
+        try {
+            System.out.println("厨师申请得到订单...");
+            while (this.orders.size() <= 0) {
+                try {
+                    orderCondition.await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            //唤醒之后,提供一个订单,并通知其他线程当前订单发生变化
+            Order order = orders.poll();
+            orderCondition.signalAll();
+            System.out.println("厨师takeOrder:记录:" + order + "还剩" + orders.size() + "个订单");
+            return order;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+
+    /**
+     * 咖啡厅关门->不再接纳新顾客(提供外部显示关闭)
      */
     public void shutDown() {
         work = false;
@@ -192,6 +195,7 @@ public final class CoffeeHourse {
         chefWorkerTasks.forEach(chefWorkerTask -> {
             chefWorkerTask.setWork(false);
         });
+        executorService.shutdown();
     }
 
     /**
@@ -202,9 +206,17 @@ public final class CoffeeHourse {
         for (int i = 0; i < maxChefNumber; ++i) {
             //启动厨师线程,数量为设定值
             ChefWorkerTask task = new ChefWorkerTask(this);
+            task.setName("厨师" + i);
             executorService.execute(task);
             chefWorkerTasks.add(task);
         }
+        //开始营业
+        try {
+            TimeUnit.SECONDS.sleep(time);
+        } catch (InterruptedException e) {
+        }
+        //关闭营业
+        shutDown();
     }
 
 

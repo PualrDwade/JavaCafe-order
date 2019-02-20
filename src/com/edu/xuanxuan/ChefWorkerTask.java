@@ -10,6 +10,16 @@ import java.util.concurrent.TimeUnit;
  */
 public class ChefWorkerTask implements Runnable {
 
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
     private volatile boolean work;
 
     public boolean isWork() {
@@ -41,19 +51,19 @@ public class ChefWorkerTask implements Runnable {
                 Coffee coffee = order.getCoffee();
                 switch (coffee) {
                     case GOUSHI:
-                        System.out.println("正在制作生产goushi咖啡");
-                        TimeUnit.SECONDS.sleep(3);
+                        System.out.println(name + "正在制作生产goushi咖啡");
+                        TimeUnit.SECONDS.sleep(6);
                         break;
                     case MAOSHI:
-                        System.out.println("正在制作生产maoshi咖啡");
+                        System.out.println(name + "正在制作生产maoshi咖啡");
                         TimeUnit.SECONDS.sleep(4);
                         break;
                     case NIUSHI:
-                        System.out.println("正在制作生产niushi咖啡");
+                        System.out.println(name + "正在制作生产niushi咖啡");
                         TimeUnit.SECONDS.sleep(5);
                         break;
                     case XIANGSHI:
-                        System.out.println("正在制作生产xiangshi咖啡");
+                        System.out.println(name + "正在制作生产xiangshi咖啡");
                         TimeUnit.SECONDS.sleep(6);
                         break;
                     default:
@@ -67,6 +77,6 @@ public class ChefWorkerTask implements Runnable {
                 e.printStackTrace();
             }
         }
-        System.out.println("厨师停止工作");
+        System.out.println(name + "停止工作");
     }
 }
